@@ -1,9 +1,24 @@
 import { Header } from "@/components/shared/Header";
-import { EventFeed } from "@/components/events/EventFeed";
-import { DEMO_EVENTS } from "@/lib/demo-data";
+import { EventsPageClient } from "@/components/events/EventsPageClient";
+import { isSupabaseConfigured, dataStore } from "@/lib/store";
+
+export const dynamic = "force-dynamic";
 
 async function getEvents() {
-  return DEMO_EVENTS;
+  if (isSupabaseConfigured()) {
+    const { createServiceClient } = await import("@/lib/supabase/server");
+    const supabase = createServiceClient();
+
+    const { data } = await supabase
+      .from("events")
+      .select("*")
+      .in("status", ["active", "monitoring"])
+      .order("created_at", { ascending: false });
+
+    return data || [];
+  }
+
+  return dataStore.getActiveEvents();
 }
 
 export default async function EventsPage() {
@@ -12,10 +27,10 @@ export default async function EventsPage() {
   return (
     <>
       <Header
-        title="事件"
-        subtitle="Grok AI 检测到的 FUD 事件"
+        title="事件与推文"
+        subtitle="Grok AI 检测到的舆情推文 · 按事件归类"
       />
-      <EventFeed events={events} />
+      <EventsPageClient events={events} />
     </>
   );
 }

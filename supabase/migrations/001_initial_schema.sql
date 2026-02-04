@@ -20,6 +20,8 @@ CREATE TABLE events (
   neutral_pct REAL DEFAULT 0,
   negative_pct REAL DEFAULT 0,
   status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'resolved', 'monitoring')),
+  key_kols TEXT[] DEFAULT '{}',
+  related_tweets JSONB DEFAULT '[]',
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -29,7 +31,9 @@ CREATE TABLE mentions (
   id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
   event_id UUID REFERENCES events(id) ON DELETE SET NULL,
   text TEXT NOT NULL,
+  text_zh TEXT,
   author TEXT NOT NULL,
+  author_handle TEXT NOT NULL DEFAULT '',
   author_followers INTEGER DEFAULT 0,
   platform TEXT NOT NULL DEFAULT 'twitter',
   url TEXT,
@@ -39,6 +43,7 @@ CREATE TABLE mentions (
   impressions BIGINT DEFAULT 0,
   source_tier INTEGER NOT NULL CHECK (source_tier IN (1, 2)),
   is_official_response BOOLEAN DEFAULT false,
+  is_kol BOOLEAN DEFAULT false,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -55,8 +60,10 @@ CREATE TABLE sentiment_snapshots (
   negative_pct REAL DEFAULT 0,
   alert_level TEXT NOT NULL DEFAULT 'green' CHECK (alert_level IN ('green', 'yellow', 'red')),
   bnb_price REAL,
+  kol_mention_count INTEGER DEFAULT 0,
   top_countries JSONB DEFAULT '{}',
   top_urls JSONB DEFAULT '[]',
+  top_kols JSONB DEFAULT '[]',
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 

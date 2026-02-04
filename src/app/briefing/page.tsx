@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Header } from "@/components/shared/Header";
 import { BriefingPanel } from "@/components/briefing/BriefingPanel";
 import { ShareButton } from "@/components/briefing/ShareButton";
@@ -10,6 +10,18 @@ import { RefreshCw } from "lucide-react";
 export default function BriefingPage() {
   const [briefing, setBriefing] = useState(DEMO_BRIEFING);
   const [loading, setLoading] = useState(false);
+
+  // Load latest briefing from API on mount
+  useEffect(() => {
+    fetch("/api/briefing")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data && data.headline) {
+          setBriefing(data);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   async function refreshBriefing() {
     setLoading(true);

@@ -208,7 +208,7 @@ export function EventDetailModal({ event, onClose }: EventDetailModalProps) {
 
                     {/* Tweet Text */}
                     <p className="text-sm text-text-secondary leading-relaxed mb-2">
-                      {tweet.text}
+                      {tweet.text_zh || tweet.text}
                     </p>
 
                     {/* Tweet Footer */}

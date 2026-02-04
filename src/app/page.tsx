@@ -10,19 +10,72 @@ import { TopKOLs } from "@/components/dashboard/TopKOLs";
 import { TopSources } from "@/components/dashboard/TopSources";
 import { ManualTrigger } from "@/components/dashboard/ManualTrigger";
 import { SearchLogs } from "@/components/dashboard/SearchLogs";
+import { isSupabaseConfigured, dataStore } from "@/lib/store";
 import {
   DEMO_SNAPSHOT,
   DEMO_PREVIOUS_SNAPSHOT,
-  DEMO_SNAPSHOTS_24H,
-  DEMO_EVENTS,
 } from "@/lib/demo-data";
+import { subHours } from "date-fns";
+
+export const dynamic = "force-dynamic";
 
 async function getData() {
+  if (isSupabaseConfigured()) {
+    const { createServiceClient } = await import("@/lib/supabase/server");
+    const supabase = createServiceClient();
+
+    // Latest snapshot
+    const { data: latestSnap } = await supabase
+      .from("sentiment_snapshots")
+      .select("*")
+      .order("timestamp", { ascending: false })
+      .limit(1)
+      .single();
+
+    // Previous snapshot (second most recent)
+    const { data: prevSnaps } = await supabase
+      .from("sentiment_snapshots")
+      .select("*")
+      .order("timestamp", { ascending: false })
+      .limit(2);
+
+    // 24h snapshots for charts
+    const since24h = subHours(new Date(), 24).toISOString();
+    const { data: snaps24h } = await supabase
+      .from("sentiment_snapshots")
+      .select("*")
+      .gte("timestamp", since24h)
+      .order("timestamp", { ascending: true });
+
+    // Active events
+    const { data: evts } = await supabase
+      .from("events")
+      .select("*")
+      .in("status", ["active", "monitoring"])
+      .order("created_at", { ascending: false });
+
+    const latestSnapshot = latestSnap || DEMO_SNAPSHOT;
+    const previousSnapshot = (prevSnaps && prevSnaps.length > 1 ? prevSnaps[1] : null) || DEMO_PREVIOUS_SNAPSHOT;
+
+    return {
+      latestSnapshot,
+      previousSnapshot,
+      snapshots24h: snaps24h || [],
+      activeEvents: evts || [],
+    };
+  }
+
+  // Fallback: in-memory store
+  const latestSnapshot = dataStore.getLatestSnapshot() || DEMO_SNAPSHOT;
+  const previousSnapshot = dataStore.getPreviousSnapshot() || DEMO_PREVIOUS_SNAPSHOT;
+  const snapshots24h = dataStore.getSnapshots24h();
+  const activeEvents = dataStore.getActiveEvents();
+
   return {
-    latestSnapshot: DEMO_SNAPSHOT,
-    previousSnapshot: DEMO_PREVIOUS_SNAPSHOT,
-    snapshots24h: DEMO_SNAPSHOTS_24H,
-    activeEvents: DEMO_EVENTS,
+    latestSnapshot,
+    previousSnapshot,
+    snapshots24h,
+    activeEvents,
   };
 }
 

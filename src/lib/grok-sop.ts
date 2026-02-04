@@ -6,8 +6,8 @@
  * Grok returns raw data.
  *
  * Flow:
- *   Step 1: SEARCH — Grok searches X/Twitter, returns ALL posts found
- *   Step 2: PARSE  — Grok structures raw text into typed objects
+ *   Step 1: SEARCH — Grok searches X/Twitter, returns ALL REAL posts found
+ *   Step 2: PARSE  — Grok structures raw text into typed objects + translates to Chinese
  *   Step 3: SCORE  — Our code scores credibility, tags events, ranks
  */
 
@@ -25,8 +25,18 @@ const EXCHANGE_LIST = EXCHANGE_ACCOUNTS.map(
 export function buildSearchPrompt(fromDate: string, toDate: string): string {
   return `You are a social media intelligence analyst. Search X/Twitter for ALL posts mentioning Binance from ${fromDate} to ${toDate}.
 
+## CRITICAL — REAL TWEETS ONLY
+- You MUST only return tweets that ACTUALLY EXIST on X/Twitter.
+- Do NOT fabricate, hallucinate, invent, or generate fake tweets.
+- Do NOT make up tweet content, authors, URLs, or engagement numbers.
+- Every tweet you return must be a real post that you found via search.
+- Every URL must be a real, valid tweet URL (https://x.com/[handle]/status/[id]).
+- If you cannot verify a tweet is real, do NOT include it.
+- If you find zero real tweets, return an empty list. An empty list is better than fake data.
+- NEVER invent tweet IDs, follower counts, or impression numbers.
+
 ## INSTRUCTIONS
-Return EVERY post you find. Do NOT filter, do NOT summarize, do NOT group.
+Return EVERY real post you find. Do NOT filter, do NOT summarize, do NOT group.
 For each post, provide the EXACT information below. If a field is unknown, write "unknown".
 
 ## SEARCH SCOPE
@@ -42,8 +52,8 @@ Post #N:
 - Author: [display name]
 - Handle: @[handle]
 - Followers: [number]
-- Text: [full tweet text, verbatim]
-- URL: [tweet URL if available, otherwise "unknown"]
+- Text: [full tweet text, verbatim, in original language]
+- URL: [real tweet URL, e.g. https://x.com/handle/status/123456789]
 - Posted at: [ISO timestamp or approximate time]
 - Impressions: [estimated number]
 - Likes: [number if visible]
@@ -55,12 +65,13 @@ Post #N:
 - Country: [author country if detectable, otherwise "unknown"]
 
 ## IMPORTANT
-- Return ALL posts, not just "significant" ones
+- Return ALL real posts, not just "significant" ones
 - Include positive, neutral, AND negative posts
 - Include small accounts AND large accounts
 - Include replies, quote tweets, and original posts
 - Include official Binance responses
 - Do NOT summarize or aggregate — list each post individually
+- ONLY include tweets you actually found. ZERO fabricated content.
 - At the end, state: "Total posts found: [N]"`;
 }
 
@@ -71,8 +82,20 @@ Post #N:
 export function buildParsePrompt(rawSearchResults: string): string {
   return `Parse the following X/Twitter search results into structured JSON data.
 
+## CRITICAL — AUTHENTICITY
+- Only parse tweets that appear to be REAL (have valid URLs, real handles, etc.)
+- If any tweet looks fabricated or has a suspicious URL format, SKIP IT.
+- Do NOT add any tweets that were not in the input.
+
+## CHINESE TRANSLATION — MANDATORY
+- For EVERY post, you MUST provide a Chinese translation in the "text_zh" field.
+- If the original text is already in Chinese, copy it as-is to "text_zh".
+- If the original text is in English or any other language, translate it accurately to Chinese.
+- The "text" field keeps the ORIGINAL text verbatim. The "text_zh" field is the Chinese translation.
+- Translation must preserve the meaning, tone, and key terms (keep crypto terms like BNB, DeFi, etc. as-is).
+
 ## RULES
-- Extract EVERY post listed — do not skip any
+- Extract EVERY post listed — do not skip any (unless it looks fabricated)
 - For each post, fill ALL fields. Use best estimates if exact numbers aren't available.
 - Sentiment scoring rules:
   - positive: defending Binance, sharing good news, bullish on BNB
@@ -104,7 +127,7 @@ export function buildEventTaggingPrompt(
 - If a post doesn't fit any narrative, tag it as "一般讨论"
 - For each event, provide:
   - title: short descriptive title in Chinese (mention key KOL if one is driving it)
-  - description: 1-2 sentence summary
+  - description: 1-2 sentence summary in Chinese
   - theme: one of [合规, 安全, 监管, 法律, 市场, 链上异动, 媒体, 官方回应, 产品, 一般讨论]
   - severity: critical/high/medium/low based on: KOL follower count, impression count, sentiment negativity
   - is_new_event: true if not in existing events list below
@@ -126,15 +149,21 @@ export function buildCompetitorSearchPrompt(
   fromDate: string,
   toDate: string
 ): string {
-  return `Search X/Twitter for posts mentioning these cryptocurrency exchanges from ${fromDate} to ${toDate}: ${exchanges.join(", ")}
+  return `Search X/Twitter for REAL posts mentioning these cryptocurrency exchanges from ${fromDate} to ${toDate}: ${exchanges.join(", ")}
+
+## CRITICAL — REAL DATA ONLY
+- Only report data based on tweets you actually found.
+- Do NOT fabricate mention counts or sentiment percentages.
+- If you cannot find data for an exchange, report 0 mentions.
+- All numbers must reflect real search results.
 
 ## INSTRUCTIONS
 For EACH exchange, provide:
 1. Total estimated mention count
 2. Sentiment breakdown (positive %, neutral %, negative %)
-3. Top 3 most-discussed topics/themes
+3. Top 3 most-discussed topics/themes (in Chinese)
 4. Number of KOL posts (accounts with 50K+ followers)
-5. Most impactful KOL post (if any)
+5. Most impactful KOL post (if any, verbatim text)
 
 ## OUTPUT FORMAT
 Exchange: [name]

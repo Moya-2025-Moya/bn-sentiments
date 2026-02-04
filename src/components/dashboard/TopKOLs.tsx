@@ -77,7 +77,7 @@ export function TopKOLs({ data }: TopKOLsProps) {
 
               {/* Tweet Text */}
               <p className="text-xs text-text-secondary leading-relaxed line-clamp-2 ml-9">
-                {kol.tweet_text}
+                {kol.tweet_text_zh || kol.tweet_text}
               </p>
 
               {/* Stats */}

@@ -9,6 +9,7 @@ export interface EventTweet {
   author_name: string;
   author_followers: number;
   text: string;
+  text_zh?: string;
   url: string | null;
   sentiment: Sentiment;
   impressions: number;
@@ -42,6 +43,7 @@ export interface Mention {
   id: string;
   event_id: string | null;
   text: string;
+  text_zh?: string;
   author: string;
   author_handle: string;
   author_followers: number;
@@ -63,6 +65,7 @@ export interface KOLActivity {
   followers: number;
   category: string;
   tweet_text: string;
+  tweet_text_zh?: string;
   sentiment: Sentiment;
   impressions: number;
   posted_at: string;
