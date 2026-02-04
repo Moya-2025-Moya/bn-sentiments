@@ -1,4 +1,6 @@
-import { generateText, generateObject } from "ai";
+import { generateObject } from "ai";
+// Note: We don't use generateText for search because it doesn't support
+// xAI's search_parameters. We call the xAI API directly instead.
 import { createXai } from "@ai-sdk/xai";
 import { z } from "zod";
 import { EXCHANGE_ACCOUNTS } from "./constants";
@@ -12,6 +14,89 @@ import {
 } from "./grok-sop";
 
 const xai = createXai({ apiKey: process.env.XAI_API_KEY });
+
+// Direct xAI Responses API call with agent tools (x_search + web_search)
+// The Vercel AI SDK's generateText doesn't support xAI's built-in search tools.
+// The Responses API handles tool execution server-side automatically.
+async function grokSearchWithTools(
+  prompt: string,
+  model: string,
+  options?: { fromDate?: string; toDate?: string }
+): Promise<string> {
+  const xSearchTool: Record<string, unknown> = { type: "x_search" };
+  if (options?.fromDate) xSearchTool.from_date = options.fromDate;
+  if (options?.toDate) xSearchTool.to_date = options.toDate;
+
+  const body = {
+    model,
+    input: [{ role: "user", content: prompt }],
+    tools: [xSearchTool, { type: "web_search" }],
+  };
+
+  console.log(`[Grok API] Calling /v1/responses with model=${model}, x_search from=${options?.fromDate} to=${options?.toDate}`);
+
+  const res = await fetch("https://api.x.ai/v1/responses", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${process.env.XAI_API_KEY}`,
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`xAI Responses API error ${res.status}: ${err}`);
+  }
+
+  const data = await res.json();
+
+  // Extract text from response.
+  // The Responses API can return text in multiple places:
+  //   data.text — top-level convenience field (may be JSON string of output entries)
+  //   data.output[] — array with type "output_text" or "text" entries
+  const textParts: string[] = [];
+
+  // 1. Check output array for output_text / text entries
+  if (Array.isArray(data.output)) {
+    for (const entry of data.output) {
+      if ((entry.type === "output_text" || entry.type === "text") && entry.text) {
+        textParts.push(entry.text);
+      }
+    }
+  }
+
+  // 2. If output array had text, use it
+  if (textParts.length > 0) {
+    return textParts.join("\n");
+  }
+
+  // 3. Try top-level text field
+  if (data.text && typeof data.text === "string" && data.text.trim()) {
+    // data.text might be a JSON string of output entries — try to parse
+    try {
+      const parsed = JSON.parse(data.text);
+      if (Array.isArray(parsed)) {
+        const extracted = parsed
+          .filter((e: any) => (e.type === "output_text" || e.type === "text") && e.text)
+          .map((e: any) => e.text);
+        if (extracted.length > 0) return extracted.join("\n");
+      }
+    } catch {
+      // Not JSON, use as plain text
+    }
+    return data.text;
+  }
+
+  // 4. Nothing found — log for debugging
+  console.error("[Grok Search] No text found. Response keys:", Object.keys(data));
+  if (Array.isArray(data.output)) {
+    const types = data.output.map((e: any) => e.type);
+    console.error("[Grok Search] Output entry types:", types);
+  }
+
+  return "";
+}
 
 export const DEFAULT_SEARCH_MODEL = "grok-4-1-fast-reasoning";
 export const DEFAULT_PARSE_MODEL = "grok-3-mini";
@@ -103,33 +188,33 @@ export async function searchBinanceMentions(
 ) {
   const parseModel = DEFAULT_PARSE_MODEL;
 
-  // Step 1: Search — get ALL raw posts
+  // Step 1: Search — get ALL raw posts (using direct xAI API with live search)
   const searchStart = Date.now();
   let rawText: string;
   const searchPrompt = buildSearchPrompt(fromDate, toDate);
 
   try {
-    const { text } = await generateText({
-      model: xai(model),
-      prompt: searchPrompt,
-    });
-    rawText = text;
+    rawText = await grokSearchWithTools(searchPrompt, model, { fromDate, toDate });
+
+    console.log(`[Grok Search] Model: ${model}, Response length: ${rawText.length} chars`);
+    console.log(`[Grok Search] First 300 chars: ${rawText.slice(0, 300)}`);
 
     searchLogStore.add({
       timestamp: new Date().toISOString(),
       type: "search",
       model,
-      prompt_summary: `[SOP Step 1] 搜索全部 Binance 推文 (${fromDate} ~ ${toDate})`,
+      prompt_summary: `[SOP Step 1] 搜索全部 Binance 推文 (${fromDate} ~ ${toDate}) [Live Search ON]`,
       status: "success",
       duration_ms: Date.now() - searchStart,
-      result_summary: text.slice(0, 500) + "...",
+      result_summary: rawText.slice(0, 500) + "...",
     });
   } catch (error) {
+    console.error(`[Grok Search] FAILED:`, error);
     searchLogStore.add({
       timestamp: new Date().toISOString(),
       type: "search",
       model,
-      prompt_summary: `[SOP Step 1] 搜索全部 Binance 推文 (${fromDate} ~ ${toDate})`,
+      prompt_summary: `[SOP Step 1] 搜索全部 Binance 推文 (${fromDate} ~ ${toDate}) [Live Search ON]`,
       status: "error",
       duration_ms: Date.now() - searchStart,
       error: String(error),
@@ -147,6 +232,11 @@ export async function searchBinanceMentions(
       schema: RawPostSchema,
       prompt: parsePrompt,
     });
+
+    console.log(`[Grok Parse] Extracted ${structured.posts.length} posts, total_found: ${structured.total_found}`);
+    if (structured.posts.length > 0) {
+      console.log(`[Grok Parse] First post: @${structured.posts[0].author_handle} — ${structured.posts[0].text.slice(0, 100)}`);
+    }
 
     searchLogStore.add({
       timestamp: new Date().toISOString(),
@@ -250,10 +340,9 @@ export async function searchAllCompetitors(
   const start = Date.now();
 
   try {
-    const { text } = await generateText({
-      model: xai(model),
-      prompt,
-    });
+    const text = await grokSearchWithTools(prompt, model, { fromDate, toDate });
+
+    console.log(`[Grok Competitor] Response length: ${text.length} chars`);
 
     const { object } = await generateObject({
       model: xai(DEFAULT_PARSE_MODEL),
@@ -265,7 +354,7 @@ export async function searchAllCompetitors(
       timestamp: new Date().toISOString(),
       type: "competitor",
       model,
-      prompt_summary: `[SOP] 搜索 ${exchangeNames.length} 家竞对交易所`,
+      prompt_summary: `[SOP] 搜索 ${exchangeNames.length} 家竞对交易所 [Live Search ON]`,
       status: "success",
       duration_ms: Date.now() - start,
       result_summary: object.exchanges.map((e) => `${e.name}: ${e.total_mentions}提及`).join(", "),

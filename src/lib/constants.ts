@@ -1,7 +1,8 @@
 export const MONITOR_KEYWORDS = [
   "binance", "BNB", "@binance", "#binance",
-  "@caboringz", "Binance FUD", "Binance scam",
-  "Binance hack", "Binance regulatory",
+  "币安", "赵长鹏", "币安交易所",
+  "#币安", "Binance FUD", "Binance scam",
+  "Binance hack", "Binance 监管",
 ];
 export const COMPETITOR_KEYWORDS = ["coinbase", "@coinbase", "#coinbase"];
 export const OFFICIAL_HANDLES = ["binance", "cz_binance", "haboringz", "BinanceUS"];

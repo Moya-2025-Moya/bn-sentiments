@@ -3,7 +3,7 @@ import { isSupabaseConfigured, dataStore } from "@/lib/store";
 import { searchBinanceMentions, tagEvents, searchAllCompetitors } from "@/lib/grok";
 import { calculateAlertLevel, determineSourceTier } from "@/lib/utils";
 import { BNB_PRICE_URL, KOL_FOLLOWER_THRESHOLD } from "@/lib/constants";
-import { subMinutes, formatISO } from "date-fns";
+import { formatISO } from "date-fns";
 import type { KOLActivity } from "@/lib/types";
 
 export const maxDuration = 60;
@@ -28,8 +28,9 @@ export async function GET(request: NextRequest) {
   }
 
   const now = new Date();
-  const thirtyMinAgo = subMinutes(now, 30);
-  const fromDate = formatISO(thirtyMinAgo, { representation: "date" });
+  // Search last 24h to catch all recent posts (dedup happens downstream)
+  const since = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+  const fromDate = formatISO(since, { representation: "date" });
   const toDate = formatISO(now, { representation: "date" });
 
   try {
@@ -156,8 +157,27 @@ export async function GET(request: NextRequest) {
     if (isSupabaseConfigured()) {
       const { createServiceClient } = await import("@/lib/supabase/server");
       const supabase = createServiceClient();
-      await supabase.from("mentions").insert(mentionRows);
+
+      // Dedup: check which URLs already exist to avoid duplicates from 24h window
+      const urls = mentionRows.map((m) => m.url).filter(Boolean);
+      let existingUrls = new Set<string>();
+      if (urls.length > 0) {
+        const { data: existing } = await supabase
+          .from("mentions")
+          .select("url")
+          .in("url", urls);
+        existingUrls = new Set((existing || []).map((e: { url: string }) => e.url));
+      }
+      const newMentions = mentionRows.filter(
+        (m) => !m.url || !existingUrls.has(m.url)
+      );
+
+      if (newMentions.length > 0) {
+        await supabase.from("mentions").insert(newMentions);
+      }
       await supabase.from("sentiment_snapshots").insert(snapshot);
+
+      console.log(`[Monitor] ${mentionRows.length} total, ${existingUrls.size} dupes, ${newMentions.length} new inserted`);
     } else {
       dataStore.addMentions(mentionRows);
       dataStore.addSnapshot(snapshot);

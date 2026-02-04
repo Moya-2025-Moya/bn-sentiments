@@ -23,55 +23,36 @@ const EXCHANGE_LIST = EXCHANGE_ACCOUNTS.map(
 // ─────────────────────────────────────────────
 
 export function buildSearchPrompt(fromDate: string, toDate: string): string {
-  return `You are a social media intelligence analyst. Search X/Twitter for ALL posts mentioning Binance from ${fromDate} to ${toDate}.
+  return `Search X/Twitter for ALL posts mentioning Binance posted between ${fromDate} and ${toDate}.
 
-## CRITICAL — REAL TWEETS ONLY
-- You MUST only return tweets that ACTUALLY EXIST on X/Twitter.
-- Do NOT fabricate, hallucinate, invent, or generate fake tweets.
-- Do NOT make up tweet content, authors, URLs, or engagement numbers.
-- Every tweet you return must be a real post that you found via search.
-- Every URL must be a real, valid tweet URL (https://x.com/[handle]/status/[id]).
-- If you cannot verify a tweet is real, do NOT include it.
-- If you find zero real tweets, return an empty list. An empty list is better than fake data.
-- NEVER invent tweet IDs, follower counts, or impression numbers.
+Search these keywords in BOTH English AND Chinese: ${MONITOR_KEYWORDS.join(", ")}
 
-## INSTRUCTIONS
-Return EVERY real post you find. Do NOT filter, do NOT summarize, do NOT group.
-For each post, provide the EXACT information below. If a field is unknown, write "unknown".
+IMPORTANT:
+- Search in ALL languages, especially Chinese (中文) and English
+- Find posts from ANY account — regular users, traders, news, KOLs, everyone
+- The more posts the better — cast a wide net
 
-## SEARCH SCOPE
-1. Search these keywords: ${MONITOR_KEYWORDS.join(", ")}
-2. Check these known KOL accounts: ${KOL_HANDLES}
-3. Check these exchange accounts:
-${EXCHANGE_LIST}
-4. Check official Binance accounts: ${OFFICIAL_HANDLES.join(", ")}
-5. Find ANY other account with significant engagement posting about Binance
-
-## OUTPUT FORMAT (for EACH post found)
+For EACH post found, list:
 Post #N:
 - Author: [display name]
 - Handle: @[handle]
-- Followers: [number]
-- Text: [full tweet text, verbatim, in original language]
-- URL: [real tweet URL, e.g. https://x.com/handle/status/123456789]
-- Posted at: [ISO timestamp or approximate time]
-- Impressions: [estimated number]
-- Likes: [number if visible]
-- Retweets: [number if visible]
-- Quote tweets: [number if visible]
-- Reply to: [parent tweet handle if this is a reply, otherwise "none"]
+- Followers: [number or estimate]
+- Text: [full tweet text verbatim]
+- URL: [tweet URL]
+- Posted at: [timestamp]
+- Impressions: [number or estimate]
+- Likes: [number]
+- Retweets: [number]
+- Quote tweets: [number]
+- Reply to: [parent handle or "none"]
 - Contains media: [yes/no]
-- Language: [detected language code]
-- Country: [author country if detectable, otherwise "unknown"]
+- Language: [language code]
+- Country: [country or "unknown"]
 
-## IMPORTANT
-- Return ALL real posts, not just "significant" ones
+RULES:
+- ONLY include posts from ${fromDate} to ${toDate}. Skip anything older.
+- List EVERY post individually — do NOT summarize or group
 - Include positive, neutral, AND negative posts
-- Include small accounts AND large accounts
-- Include replies, quote tweets, and original posts
-- Include official Binance responses
-- Do NOT summarize or aggregate — list each post individually
-- ONLY include tweets you actually found. ZERO fabricated content.
 - At the end, state: "Total posts found: [N]"`;
 }
 
@@ -81,11 +62,6 @@ Post #N:
 
 export function buildParsePrompt(rawSearchResults: string): string {
   return `Parse the following X/Twitter search results into structured JSON data.
-
-## CRITICAL — AUTHENTICITY
-- Only parse tweets that appear to be REAL (have valid URLs, real handles, etc.)
-- If any tweet looks fabricated or has a suspicious URL format, SKIP IT.
-- Do NOT add any tweets that were not in the input.
 
 ## CHINESE TRANSLATION — MANDATORY
 - For EVERY post, you MUST provide a Chinese translation in the "text_zh" field.
@@ -149,13 +125,7 @@ export function buildCompetitorSearchPrompt(
   fromDate: string,
   toDate: string
 ): string {
-  return `Search X/Twitter for REAL posts mentioning these cryptocurrency exchanges from ${fromDate} to ${toDate}: ${exchanges.join(", ")}
-
-## CRITICAL — REAL DATA ONLY
-- Only report data based on tweets you actually found.
-- Do NOT fabricate mention counts or sentiment percentages.
-- If you cannot find data for an exchange, report 0 mentions.
-- All numbers must reflect real search results.
+  return `Use the x_search tool to find posts mentioning these cryptocurrency exchanges: ${exchanges.join(", ")}
 
 ## INSTRUCTIONS
 For EACH exchange, provide:
