@@ -4,7 +4,7 @@ import { Card } from "@/components/shared/Card";
 import { ExternalLink } from "lucide-react";
 
 interface TopSourcesProps {
-  data: { url: string; count: number }[];
+  data: ({ url: string; count: number } | string)[];
 }
 
 function extractDomain(url: string): string {
@@ -16,7 +16,9 @@ function extractDomain(url: string): string {
 }
 
 export function TopSources({ data }: TopSourcesProps) {
-  const sources = data.slice(0, 8);
+  const sources = (data || []).slice(0, 8).map((item) =>
+    typeof item === "string" ? { url: item, count: 0 } : item
+  );
 
   if (sources.length === 0) {
     return (

@@ -55,14 +55,14 @@ export function TopKOLs({ data }: TopKOLsProps) {
                       <span>@{displayHandle}</span>
                       <span>{formatNumber(kol.followers)} 粉丝</span>
                       <span className="px-1 py-0 rounded bg-bg-base text-text-tertiary">
-                        {kol.category}
+                        {kol.category || ""}
                       </span>
                     </div>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   <span className="text-[10px] text-text-tertiary">
-                    {timeAgo(kol.posted_at)}
+                    {kol.posted_at ? timeAgo(kol.posted_at) : ""}
                   </span>
                   {kol.url && (
                     <a
@@ -79,13 +79,13 @@ export function TopKOLs({ data }: TopKOLsProps) {
 
               {/* Tweet Text */}
               <p className="text-xs text-text-secondary leading-relaxed line-clamp-2 ml-9">
-                {kol.tweet_text_zh || kol.tweet_text}
+                {kol.tweet_text_zh || kol.tweet_text || ""}
               </p>
 
               {/* Stats */}
               <div className="flex items-center gap-3 ml-9 mt-1">
                 <span className="text-[10px] text-text-tertiary">
-                  曝光 {formatNumber(kol.impressions)}
+                  曝光 {formatNumber(kol.impressions || 0)}
                 </span>
                 <span className={`text-[10px] font-medium ${style.text}`}>
                   {style.label}
