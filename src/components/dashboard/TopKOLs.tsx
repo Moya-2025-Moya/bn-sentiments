@@ -31,6 +31,8 @@ export function TopKOLs({ data }: TopKOLsProps) {
       <div className="space-y-3">
         {data.slice(0, 6).map((kol, i) => {
           const style = SENTIMENT_STYLES[kol.sentiment];
+          const displayName = kol.name || (kol as any).author?.replace(/^@/, '') || "Unknown";
+          const displayHandle = kol.handle || (kol as any).author?.replace(/^@/, '') || "unknown";
           return (
             <div
               key={i}
@@ -40,17 +42,17 @@ export function TopKOLs({ data }: TopKOLsProps) {
               <div className="flex items-center justify-between mb-1.5">
                 <div className="flex items-center gap-2 min-w-0">
                   <div className="w-7 h-7 rounded-full bg-bg-base border border-border-default flex items-center justify-center text-xs font-bold text-gold shrink-0">
-                    {kol.name[0]}
+                    {displayName[0]}
                   </div>
                   <div className="min-w-0">
                     <div className="flex items-center gap-1.5">
                       <span className="text-sm font-medium text-text-primary truncate">
-                        {kol.name}
+                        {displayName}
                       </span>
                       <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${style.dot}`} />
                     </div>
                     <div className="flex items-center gap-2 text-[10px] text-text-tertiary">
-                      <span>@{kol.handle}</span>
+                      <span>@{displayHandle}</span>
                       <span>{formatNumber(kol.followers)} 粉丝</span>
                       <span className="px-1 py-0 rounded bg-bg-base text-text-tertiary">
                         {kol.category}
